@@ -1,0 +1,47 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+// Looking for ways to speed up your queries, or scale easily with your serverless or edge functions?
+// Try Prisma Accelerate: https://pris.ly/cli/accelerate-init
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model Estado {
+  id      Int     @id @default(autoincrement())
+  nombre  String
+  ambito  String?
+  eventos EventoSismico[]
+  cambios        CambioEstado[]
+}
+
+model EventoSismico {
+  id                Int      @id @default(autoincrement())
+  fechaHora         DateTime
+  latitudEpicentro  Float
+  longitudEpicentro Float
+  magnitud          Float
+  profundidad       Float
+  alcance           String?
+  origen            String?
+  clasificacion     String?
+  estadoId          Int
+  estado            Estado   @relation(fields: [estadoId], references: [id])
+  cambios           CambioEstado[]
+}
+
+model CambioEstado {
+  id             Int      @id @default(autoincrement())
+  fechaHoraInicio DateTime
+  fechaHoraFin    DateTime?
+  eventoId        Int
+  evento          EventoSismico @relation(fields: [eventoId], references: [id])
+  estadoId        Int
+  estado          Estado        @relation(fields: [estadoId], references: [id])
+}
