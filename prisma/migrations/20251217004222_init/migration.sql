@@ -11,13 +11,17 @@ CREATE TABLE "Estado" (
 CREATE TABLE "EventoSismico" (
     "id" SERIAL NOT NULL,
     "fechaHora" TIMESTAMP(3) NOT NULL,
-    "latitudEpicentro" DOUBLE PRECISION NOT NULL,
-    "longitudEpicentro" DOUBLE PRECISION NOT NULL,
     "magnitud" DOUBLE PRECISION NOT NULL,
     "profundidad" DOUBLE PRECISION NOT NULL,
-    "alcance" TEXT,
-    "origen" TEXT,
-    "clasificacion" TEXT,
+    "latitud" DOUBLE PRECISION NOT NULL,
+    "longitud" DOUBLE PRECISION NOT NULL,
+    "ubicacion" TEXT NOT NULL,
+    "region" TEXT NOT NULL,
+    "origen" TEXT NOT NULL,
+    "clasificacion" TEXT NOT NULL,
+    "alcance" TEXT NOT NULL,
+    "revisadoPor" TEXT,
+    "observaciones" TEXT,
     "estadoId" INTEGER NOT NULL,
 
     CONSTRAINT "EventoSismico_pkey" PRIMARY KEY ("id")

@@ -16,24 +16,34 @@ datasource db {
 model Estado {
   id      Int     @id @default(autoincrement())
   nombre  String
+
   ambito  String?
+  
   eventos EventoSismico[]
   cambios        CambioEstado[]
 }
 
 model EventoSismico {
-  id                Int      @id @default(autoincrement())
-  fechaHora         DateTime
-  latitudEpicentro  Float
-  longitudEpicentro Float
-  magnitud          Float
-  profundidad       Float
-  alcance           String?
-  origen            String?
-  clasificacion     String?
-  estadoId          Int
-  estado            Estado   @relation(fields: [estadoId], references: [id])
-  cambios           CambioEstado[]
+  id           Int       @id @default(autoincrement())
+  fechaHora    DateTime
+  magnitud     Float
+  profundidad  Float
+  latitud      Float
+  longitud     Float
+  ubicacion    String
+  region       String
+
+  origen        String
+  clasificacion String
+  alcance       String
+
+  revisadoPor   String?
+  observaciones String?
+
+  estadoId Int
+  estado   Estado @relation(fields: [estadoId], references: [id])
+
+  cambios CambioEstado[]
 }
 
 model CambioEstado {
