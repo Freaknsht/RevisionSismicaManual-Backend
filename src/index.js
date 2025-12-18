@@ -12,6 +12,8 @@ app.use(express.json());
 
 app.use("/health", healthRouter);
 
+app.use("/api/sismos", sismosRoutes);
+
 const PORT = process.env.PORT || 4000;
 app.listen(PORT, () => {
     console.log(`Backend escuchando en http://localhost:${PORT}`);

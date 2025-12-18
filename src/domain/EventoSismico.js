@@ -9,7 +9,9 @@ export default class EventoSismico {
         // Datos del sismo
         this.magnitud = eventoDB.magnitud;
         this.ubicacion = eventoDB.ubicacion;
-        this.coordenadas = eventoDB.coordenadas;
+        // ✅ CORREGIDO: Usar latitud y longitud, no coordenadas
+        this.latitud = eventoDB.latitud;
+        this.longitud = eventoDB.longitud;
         this.profundidad = eventoDB.profundidad;
         this.fechaHora = new Date(eventoDB.fechaHora);
         this.region = eventoDB.region;
@@ -20,16 +22,13 @@ export default class EventoSismico {
         this.estado = eventoDB.estado;
 
         // ✅ CORREGIDO: Mapear correctamente cambios de la BD
-        this.cambiosDeEstado = (eventoDB.cambiosDeEstado || eventoDB.cambios || []).map(
+        this.cambiosDeEstado = (eventoDB.cambiosDeEstado || []).map(
             c => new CambioEstado(c)
         );
         
         // Nuevo estado después de transición (usado en ejecutarCambioEstado)
         this.nuevoEstado = null;
     }
-
-    // ✅ REMOVIDO: crearEventoSismico (lo hace el service)
-    // ✅ REMOVIDO: determinarEstadoInicial (lo hace el service)
 
     actualizarEstadoPorTiempo(fechaActual) {
         if (this.estado.nombre === "Autodetectado") {

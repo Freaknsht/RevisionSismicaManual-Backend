@@ -9,7 +9,7 @@ export const getSismos = async () => {
   return await prisma.eventoSismico.findMany({
     include: {
       estado: true,
-      cambios: true
+      cambios: true  // ✅ Verificar que sea el nombre correcto en schema
     }
   });
 };
@@ -18,7 +18,7 @@ export const getSismos = async () => {
 export async function crearEventoSismico(datos) {
   const evento = new EventoSismico(datos);
 
-  // ✅ CORREGIDO: Lógica de magnitud invertida
+  // ✅ CORREGIDO: Lógica de magnitud
   let estadoInicial;
   if (evento.magnitud >= 4.0) {
     // Magnitud alta = Autoconfirmado
@@ -28,25 +28,39 @@ export async function crearEventoSismico(datos) {
     estadoInicial = new AutoDetectado();
   }
 
-  // ✅ CORREGIDO: Mapeo correcto de propiedades
+  // ✅ CORREGIDO: Usar latitud/longitud en lugar de coordenadas
   const eventoDB = await prisma.eventoSismico.create({
     data: {
       magnitud: evento.magnitud,
       ubicacion: evento.ubicacion,
-      coordenadas: evento.coordenadas,
+      latitud: evento.latitud,
+      longitud: evento.longitud,
       profundidad: evento.profundidad,
       fechaHora: evento.fechaHora,
       region: evento.region,
+      origen: evento.origen || "Sensor automático",
+      clasificacion: evento.clasificacion || "Media",
+      alcance: evento.alcance || "Local",
       observaciones: evento.observaciones,
       revisadoPor: evento.revisadoPor,
       estado: {
-        connect: { nombre: estadoInicial.nombre }
+        connect: { id: estadoInicial.puedeIniciar(evento) ? 1 : 2 }  // Ajustar IDs según tu BD
       }
     },
-    include: { estado: true }
+    include: { 
+      estado: true,
+      cambios: true 
+    }
   });
 
-  estadoInicial.iniciar(eventoDB, new Date());
+  // Crear cambio de estado inicial
+  await prisma.cambioEstado.create({
+    data: {
+      eventoId: eventoDB.id,
+      estadoId: eventoDB.estadoId,
+      fechaHoraInicio: new Date()
+    }
+  });
 
   if (estadoInicial.nombre === "Autodetectado") {
     iniciarTemporizadores(eventoDB.id);
@@ -68,7 +82,7 @@ export async function getSismosPendientes() {
     },
     include: {
       estado: true,
-      cambios: true
+      cambios: true  // ✅ Verificar nombre de relación
     },
   });
 }
@@ -77,7 +91,10 @@ export async function getSismosPendientes() {
 export async function iniciarRevisionSismo(eventoId) {
   const evento = await prisma.eventoSismico.findUnique({
     where: { id: Number(eventoId) },
-    include: { estado: true }
+    include: { 
+      estado: true,
+      cambios: true
+    }
   });
 
   if (!evento) {
@@ -85,7 +102,7 @@ export async function iniciarRevisionSismo(eventoId) {
   }
 
   if (!esAmbitoEventoSismico(evento)) {
-    throw new Error("El evento no está en ámbito de revisión");
+    throw new Error(`El evento no está en ámbito de revisión. Estado actual: ${evento.estado.nombre}`);
   }
 
   if (evento.estado.nombre === "Bloqueado en Revisión") {
@@ -100,11 +117,13 @@ export async function iniciarRevisionSismo(eventoId) {
     throw new Error("Estado 'Bloqueado en Revisión' no existe");
   }
 
+  // ✅ Actualizar estado
   await prisma.eventoSismico.update({
     where: { id: evento.id },
     data: { estadoId: estadoBloqueado.id }
   });
 
+  // ✅ Crear cambio de estado
   await prisma.cambioEstado.create({
     data: {
       eventoId: evento.id,
@@ -113,7 +132,7 @@ export async function iniciarRevisionSismo(eventoId) {
     }
   });
 
-  return { mensaje: "Revisión iniciada correctamente" };
+  return { mensaje: "Revisión iniciada correctamente", eventoId: evento.id };
 }
 
 //Busca el Ambito del evento sismico
@@ -143,40 +162,66 @@ async function ejecutarCambioEstado(eventoId, accion) {
     where: { id: Number(eventoId) },
     include: {
       estado: true,
-      cambiosDeEstado: true,  // ✅ CORREGIDO: cargar cambios completos
+      cambios: true
     },
   });
 
-  if (!eventoDB) throw new Error("Evento no encontrado");
-  if (eventoDB.estado.nombre !== "Bloqueado en Revisión")
-    throw new Error("El evento no está en Bloqueado en Revisión");
+  if (!eventoDB) {
+    throw new Error("Evento no encontrado");
+  }
+  
+  if (eventoDB.estado.nombre !== "Bloqueado en Revisión") {
+    throw new Error(`El evento no está en Bloqueado en Revisión. Estado actual: ${eventoDB.estado.nombre}`);
+  }
 
-  // ✅ CORREGIDO: pasar cambiosDeEstado al constructor
+  // ✅ Crear evento de dominio con cambios cargados
   const evento = new EventoSismico({
     ...eventoDB,
-    cambiosDeEstado: eventoDB.cambiosDeEstado  // ✅ Asegurar que se mapee correctamente
+    cambiosDeEstado: eventoDB.cambios || []
   });
   
-  const estado = new BloqueadoEnRevision();  // ✅ Usar constructor
+  const estado = new BloqueadoEnRevision();
 
   // ✅ Ejecutar acción en el estado
-  estado[accion](new Date(), null, evento);
+  try {
+    estado[accion](new Date(), null, evento);
+  } catch (error) {
+    throw new Error(`Error al ejecutar acción '${accion}': ${error.message}`);
+  }
+
+  if (!evento.nuevoEstado) {
+    throw new Error("El estado no fue actualizado correctamente");
+  }
 
   const nuevoEstado = await prisma.estado.findFirst({
     where: { nombre: evento.nuevoEstado },
   });
 
   if (!nuevoEstado) {
-    throw new Error(`Estado '${evento.nuevoEstado}' no existe`);
+    throw new Error(`Estado '${evento.nuevoEstado}' no existe en la BD`);
   }
 
   // ✅ Actualizar estado en BD
-  await prisma.eventoSismico.update({
+  const eventoActualizado = await prisma.eventoSismico.update({
     where: { id: evento.id },
     data: { estadoId: nuevoEstado.id },
+    include: {
+      estado: true,
+      cambios: true
+    }
   });
 
-  // ✅ Crear nuevo registro de cambio de estado
+  // ✅ Cerrar cambio actual y crear nuevo
+  await prisma.cambioEstado.updateMany({
+    where: {
+      eventoId: evento.id,
+      fechaHoraFin: null
+    },
+    data: {
+      fechaHoraFin: new Date()
+    }
+  });
+
   await prisma.cambioEstado.create({
     data: {
       eventoId: evento.id,
@@ -185,14 +230,17 @@ async function ejecutarCambioEstado(eventoId, accion) {
     },
   });
 
-  return { mensaje: `Evento ${accion}do correctamente` };
+  return { 
+    mensaje: `Evento ${accion}do correctamente`,
+    evento: eventoActualizado
+  };
 }
 
 //Inicia el contador para los estados
 function iniciarTemporizadores(eventoId) {
   // 5 minutos → Pendiente de Revisión
-  setTimeout(() => {
-    cambiarEstadoSiSigue(
+  setTimeout(async () => {
+    await cambiarEstadoSiSigue(
       eventoId,
       "Autodetectado",
       "Pendiente de Revisión"
@@ -200,8 +248,8 @@ function iniciarTemporizadores(eventoId) {
   }, 5 * 60 * 1000);
 
   // 10 minutos → Evento sin Revisión
-  setTimeout(() => {
-    cambiarEstadoSiSigue(
+  setTimeout(async () => {
+    await cambiarEstadoSiSigue(
       eventoId,
       "Pendiente de Revisión",
       "Evento sin Revision"
@@ -210,29 +258,35 @@ function iniciarTemporizadores(eventoId) {
 }
 
 async function cambiarEstadoSiSigue(eventoId, estadoActual, estadoNuevo) {
-  const evento = await prisma.eventoSismico.findUnique({
-    where: { id: eventoId },
-    include: { estado: true }
-  });
+  try {
+    const evento = await prisma.eventoSismico.findUnique({
+      where: { id: eventoId },
+      include: { estado: true }
+    });
 
-  if (!evento || evento.estado.nombre !== estadoActual) return;
+    if (!evento || evento.estado.nombre !== estadoActual) return;
 
-  const nuevoEstado = await prisma.estado.findFirst({
-    where: { nombre: estadoNuevo }
-  });
+    const nuevoEstado = await prisma.estado.findFirst({
+      where: { nombre: estadoNuevo }
+    });
 
-  if (!nuevoEstado) return;
+    if (!nuevoEstado) return;
 
-  await prisma.eventoSismico.update({
-    where: { id: eventoId },
-    data: { estadoId: nuevoEstado.id }
-  });
+    await prisma.eventoSismico.update({
+      where: { id: eventoId },
+      data: { estadoId: nuevoEstado.id }
+    });
 
-  await prisma.cambioEstado.create({
-    data: {
-      eventoId,
-      estadoId: nuevoEstado.id,
-      fechaHoraInicio: new Date()
-    }
-  });
+    await prisma.cambioEstado.create({
+      data: {
+        eventoId,
+        estadoId: nuevoEstado.id,
+        fechaHoraInicio: new Date()
+      }
+    });
+
+    console.log(`✅ Evento ${eventoId} pasó de ${estadoActual} a ${estadoNuevo}`);
+  } catch (error) {
+    console.error(`❌ Error al cambiar estado del evento ${eventoId}:`, error.message);
+  }
 }
