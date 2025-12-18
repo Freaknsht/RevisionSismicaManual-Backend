@@ -1,7 +1,9 @@
 import prisma from "../prisma/client.js";
 import EventoSismico from "../domain/EventoSismico.js";
+import BloqueadoEnRevision from "../domain/estados/BloqueadoEnRevision.js";
 import { crearEstado } from "../domain/estados/EstadoFactory.js";
 
+//Obtiene los sismos
 export const getSismos = async () => {
   return await prisma.eventoSismico.findMany({
     include: {
@@ -71,43 +73,62 @@ export async function iniciarRevisionSismo(eventoId) {
   return { mensaje: "Revisión iniciada correctamente" };
 }
 
+//Busca el Ambito del evento sismico
 function esAmbitoEventoSismico(evento) {
   // Ejemplo: solo eventos autodetectados
   return evento.estado.nombre === "Autodetectado";
 }
 
-export async function rechazarSismo(eventoId, empleado) {
+//Confirma el sismo
+export const confirmarSismo = async (eventoId) => {
+  return ejecutarCambioEstado(eventoId, "confirmar");
+};
+
+//Rechaza el sismo
+export const rechazarSismo = async (eventoId) => {
+  return ejecutarCambioEstado(eventoId, "rechazar");
+};
+
+//Deriva a un experto el sismo
+export const derivarSismo = async (eventoId) => {
+  return ejecutarCambioEstado(eventoId, "derivar");
+};
+
+//Hace el cambio de estado
+async function ejecutarCambioEstado(eventoId, accion) {
   const eventoDB = await prisma.eventoSismico.findUnique({
     where: { id: Number(eventoId) },
-    include: { estado: true, cambios: true }
+    include: {
+      estado: true,
+      cambios: true,
+    },
   });
+
+  if (!eventoDB) throw new Error("Evento no encontrado");
+  if (eventoDB.estado.nombre !== "Bloqueado en Revisión")
+    throw new Error("El evento no está en Bloqueado en Revisión");
 
   const evento = new EventoSismico(eventoDB);
-  const estadoObj = crearEstado(evento.estado.nombre);
+  const estado = new BloqueadoEnRevision("Bloqueado en Revisión");
 
-  evento.rechazar(new Date(), empleado, estadoObj);
+  estado[accion](new Date(), null, evento);
 
-  // Persistencia
-  await prisma.cambioEstado.updateMany({
-    where: { eventoId: evento.id, fechaHoraFin: null },
-    data: { fechaHoraFin: new Date() }
-  });
-
-  const estadoNuevo = await prisma.estado.findFirst({
-    where: { nombre: evento.nuevoEstado }
+  const nuevoEstado = await prisma.estado.findFirst({
+    where: { nombre: evento.nuevoEstado },
   });
 
   await prisma.eventoSismico.update({
     where: { id: evento.id },
-    data: { estadoId: estadoNuevo.id }
+    data: { estadoId: nuevoEstado.id },
   });
 
   await prisma.cambioEstado.create({
     data: {
       eventoId: evento.id,
-      estadoId: estadoNuevo.id,
+      estadoId: nuevoEstado.id,
       fechaHoraInicio: new Date(),
-      empleadoId: empleado.id
-    }
+    },
   });
+
+  return { mensaje: `Evento ${accion} correctamente` };
 }

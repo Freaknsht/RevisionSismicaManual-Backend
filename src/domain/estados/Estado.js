@@ -1,57 +1,29 @@
 export default class Estado {
-
-    constructor(estadoDB) {
-    this.id = estadoDB.id;
-    this.nombre = estadoDB.nombre;
+    constructor(nombre) {
+        this.nombre = nombre;
     }
 
-    confirmar(fechaHoraActual, empleadoLogueado, eventoSismico, cambiosDeEstado) {
-        throw new Error(
-        `No se puede CONFIRMAR un evento en estado ${this.nombre}`
-        );
-    }
-
-    rechazar(
-        fechaHoraActual,
-        empleadoLogueado,
-        eventoSismico,
-        cambiosDeEstado,
-        observacion
-    ) {
-        throw new Error(
-        `No se puede RECHAZAR un evento en estado ${this.nombre}`
-        );
-    }
-
-    derivar(fechaHoraActual, empleadoLogueado, eventoSismico, cambiosDeEstado) {
-        throw new Error(
-        `No se puede DERIVAR un evento en estado ${this.nombre}`
-        );
-    }
-
-    // =========================
-    // Métodos comunes del State
-    // =========================
-
-    cerrarCambioDeEstado(cambiosDeEstado, fechaHoraActual) {
-        const cambioActivo = cambiosDeEstado.find(
-        cambio => !cambio.tieneFechaFin()
-        );
-
-        if (cambioActivo) {
-        cambioActivo.setFechaFin(fechaHoraActual);
+    cerrarCambioDeEstado(evento, fechaHora) {
+        const cambioAbierto = evento.cambios.find(c => !c.fechaHoraFin);
+        if (cambioAbierto) {
+        cambioAbierto.fechaHoraFin = fechaHora;
         }
     }
 
-    crearNuevoCambioEstado(estadoNuevo, fechaHoraActual) {
-        return new CambioEstado({
-        estado: {
-            id: estadoNuevo.id,
-            nombre: estadoNuevo.nombre
-        },
-        fechaHoraInicio: fechaHoraActual
-        });
+    crearNuevoEstado(evento, nombreNuevoEstado) {
+        evento.nuevoEstado = nombreNuevoEstado;
     }
 
-    
+    // Métodos “abstractos” (conceptuales)
+    rechazar() {
+        throw new Error("Operación no permitida en este estado");
+    }
+
+    confirmar() {
+        throw new Error("Operación no permitida en este estado");
+    }
+
+    derivar() {
+        throw new Error("Operación no permitida en este estado");
+    }
 }

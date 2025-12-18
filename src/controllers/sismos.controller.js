@@ -28,22 +28,29 @@ export async function iniciarRevision(req, res) {
     res.status(400).json({ error: error.message });
   }
 }
-export const confirmar = (req, res) =>
-  ejecutar(req, res, "confirmar");
-
-export const rechazar = (req, res) =>
-  ejecutar(req, res, "rechazar");
-
-export const derivar = (req, res) =>
-  ejecutar(req, res, "derivar");
-
-async function ejecutar(req, res, accion) {
+export const confirmar = async (req, res) => {
   try {
-    const { id } = req.params;
-    const { observacion } = req.body;
-    const r = await ejecutarAccion(id, accion, observacion);
-    res.json(r);
+    const result = await confirmarSismo(req.params.id);
+    res.json(result);
   } catch (e) {
     res.status(400).json({ error: e.message });
   }
-}
+};
+
+export const rechazar = async (req, res) => {
+  try {
+    const result = await rechazarSismo(req.params.id);
+    res.json(result);
+  } catch (e) {
+    res.status(400).json({ error: e.message });
+  }
+};
+
+export const derivar = async (req, res) => {
+  try {
+    const result = await derivarSismo(req.params.id);
+    res.json(result);
+  } catch (e) {
+    res.status(400).json({ error: e.message });
+  }
+};

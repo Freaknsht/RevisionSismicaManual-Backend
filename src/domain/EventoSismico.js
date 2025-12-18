@@ -1,12 +1,24 @@
-import { CambioEstado } from "./CambioEstado.js";
+import CambioEstado from "./CambioEstado.js";
 
-export class EventoSismico {
-    constructor(eventoDB, estado, cambiosDeEstado = []) {
+export default class EventoSismico {
+    constructor(eventoDB) {
         this.id = eventoDB.id;
-        this.fechaHora = eventoDB.fechaHora;
+
+        // Datos del sismo
         this.magnitud = eventoDB.magnitud;
-        this.estado = estado;
-        this.cambiosDeEstado = cambiosDeEstado;
+        this.ubicacion = eventoDB.location;
+        this.coordenadas = eventoDB.coordinates;
+        this.profundidad = eventoDB.depth;
+        this.fechaHora = new Date(eventoDB.timestamp);
+        this.region = eventoDB.region;
+        this.observaciones = eventoDB.notes || null;
+        this.revisadoPor = eventoDB.reviewedBy || null;
+
+        // Estado actual (instancia de Estado)
+        this.estado = eventoDB.estado;
+
+        // Historial de cambios
+        this.cambiosDeEstado = eventoDB.cambios || [];
     }
 
     // =========================
@@ -17,8 +29,7 @@ export class EventoSismico {
         this.estado.confirmar(
         fechaHoraActual,
         empleadoLogueado,
-        this,
-        this.cambiosDeEstado
+        this
         );
     }
 
@@ -27,7 +38,6 @@ export class EventoSismico {
         fechaHoraActual,
         empleadoLogueado,
         this,
-        this.cambiosDeEstado,
         observacion
         );
     }
@@ -36,8 +46,7 @@ export class EventoSismico {
         this.estado.derivar(
         fechaHoraActual,
         empleadoLogueado,
-        this,
-        this.cambiosDeEstado
+        this
         );
     }
 
@@ -49,32 +58,20 @@ export class EventoSismico {
         this.estado = nuevoEstado;
     }
 
-    agregarCambioEstado(cambioEstado) {
-        this.cambiosDeEstado.push(cambioEstado);
-    }
-
-    obtenerCambioEstadoActivo() {
-        return this.cambiosDeEstado.find(
-        cambio => !cambio.tieneFechaFin()
-        );
-    }
-
     cerrarCambioEstadoActivo(fechaHoraActual) {
-        const cambioActivo = this.obtenerCambioEstadoActivo();
+        const cambioActivo = this.cambiosDeEstado.find(
+        c => !c.fechaHoraFin
+        );
         if (cambioActivo) {
         cambioActivo.setFechaFin(fechaHoraActual);
         }
     }
 
     crearNuevoCambioEstado(estadoNuevo, fechaHoraActual) {
-        const nuevoCambio = new CambioEstado({
-        estado: {
-            id: estadoNuevo.id,
-            nombre: estadoNuevo.nombre
-        },
+        const cambio = new CambioEstado({
+        estado: estadoNuevo,
         fechaHoraInicio: fechaHoraActual
         });
-
-        this.agregarCambioEstado(nuevoCambio);
+        this.cambiosDeEstado.push(cambio);
     }
 }
