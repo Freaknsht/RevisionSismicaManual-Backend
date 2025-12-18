@@ -1,6 +1,4 @@
 import CambioEstado from "./CambioEstado.js";
-import AutoDetectado from "./estados/AutoDetectado.js";
-import Autoconfirmado from "./estados/Autoconfirmado.js";
 
 export default class EventoSismico {
     constructor(eventoDB) {
@@ -9,7 +7,6 @@ export default class EventoSismico {
         // Datos del sismo
         this.magnitud = eventoDB.magnitud;
         this.ubicacion = eventoDB.ubicacion;
-        // ✅ CORREGIDO: Usar latitud y longitud, no coordenadas
         this.latitud = eventoDB.latitud;
         this.longitud = eventoDB.longitud;
         this.profundidad = eventoDB.profundidad;
@@ -21,7 +18,7 @@ export default class EventoSismico {
         // Estado actual (instancia de Estado)
         this.estado = eventoDB.estado;
 
-        // ✅ CORREGIDO: Mapear correctamente cambios de la BD
+        // Mapear correctamente cambios de la BD
         this.cambiosDeEstado = (eventoDB.cambiosDeEstado || []).map(
             c => new CambioEstado(c)
         );

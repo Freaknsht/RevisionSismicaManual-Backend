@@ -9,7 +9,7 @@ export const getSismos = async () => {
   return await prisma.eventoSismico.findMany({
     include: {
       estado: true,
-      cambios: true  // ✅ Verificar que sea el nombre correcto en schema
+      cambios: true 
     }
   });
 };
@@ -18,7 +18,6 @@ export const getSismos = async () => {
 export async function crearEventoSismico(datos) {
   const evento = new EventoSismico(datos);
 
-  // ✅ CORREGIDO: Lógica de magnitud
   let estadoInicial;
   if (evento.magnitud >= 4.0) {
     // Magnitud alta = Autoconfirmado
@@ -28,7 +27,6 @@ export async function crearEventoSismico(datos) {
     estadoInicial = new AutoDetectado();
   }
 
-  // ✅ CORREGIDO: Usar latitud/longitud en lugar de coordenadas
   const eventoDB = await prisma.eventoSismico.create({
     data: {
       magnitud: evento.magnitud,
@@ -44,7 +42,7 @@ export async function crearEventoSismico(datos) {
       observaciones: evento.observaciones,
       revisadoPor: evento.revisadoPor,
       estado: {
-        connect: { id: estadoInicial.puedeIniciar(evento) ? 1 : 2 }  // Ajustar IDs según tu BD
+        connect: { id: estadoInicial.puedeIniciar(evento) ? 1 : 2 } 
       }
     },
     include: { 
@@ -82,7 +80,7 @@ export async function getSismosPendientes() {
     },
     include: {
       estado: true,
-      cambios: true  // ✅ Verificar nombre de relación
+      cambios: true 
     },
   });
 }
@@ -117,13 +115,13 @@ export async function iniciarRevisionSismo(eventoId) {
     throw new Error("Estado 'Bloqueado en Revisión' no existe");
   }
 
-  // ✅ Actualizar estado
+  // Actualizar estado
   await prisma.eventoSismico.update({
     where: { id: evento.id },
     data: { estadoId: estadoBloqueado.id }
   });
 
-  // ✅ Crear cambio de estado
+  // Crear cambio de estado
   await prisma.cambioEstado.create({
     data: {
       eventoId: evento.id,
@@ -135,9 +133,8 @@ export async function iniciarRevisionSismo(eventoId) {
   return { mensaje: "Revisión iniciada correctamente", eventoId: evento.id };
 }
 
-//Busca el Ambito del evento sismico
+//Busca el Ambito del evento sismico, tiene que estar en Autodetectado o en Pendiente de revision
 function esAmbitoEventoSismico(evento) {
-  // ✅ CORREGIDO: Puede estar en Autodetectado O Pendiente de Revisión
   return evento.estado.nombre === "Autodetectado" || evento.estado.nombre === "Pendiente de Revisión";
 }
 
@@ -174,7 +171,7 @@ async function ejecutarCambioEstado(eventoId, accion) {
     throw new Error(`El evento no está en Bloqueado en Revisión. Estado actual: ${eventoDB.estado.nombre}`);
   }
 
-  // ✅ Crear evento de dominio con cambios cargados
+  // Crear evento de dominio con cambios cargados
   const evento = new EventoSismico({
     ...eventoDB,
     cambiosDeEstado: eventoDB.cambios || []
@@ -182,7 +179,7 @@ async function ejecutarCambioEstado(eventoId, accion) {
   
   const estado = new BloqueadoEnRevision();
 
-  // ✅ Ejecutar acción en el estado
+  // Ejecuta acción en el estado
   try {
     estado[accion](new Date(), null, evento);
   } catch (error) {
@@ -201,7 +198,7 @@ async function ejecutarCambioEstado(eventoId, accion) {
     throw new Error(`Estado '${evento.nuevoEstado}' no existe en la BD`);
   }
 
-  // ✅ Actualizar estado en BD
+  // Actualiza el estado en BD
   const eventoActualizado = await prisma.eventoSismico.update({
     where: { id: evento.id },
     data: { estadoId: nuevoEstado.id },
@@ -211,7 +208,7 @@ async function ejecutarCambioEstado(eventoId, accion) {
     }
   });
 
-  // ✅ Cerrar cambio actual y crear nuevo
+  // Cerrar cambioEstado actual y crea uno nuevo
   await prisma.cambioEstado.updateMany({
     where: {
       eventoId: evento.id,

@@ -3,7 +3,7 @@ export default class Estado {
         this.nombre = nombre;
     }
 
-    // ✅ Métodos abstractos (implementados por subclases)
+    // Métodos abstractos (implementados por subclases)
     rechazar(fechaHora, empleado, evento, observacion) {
         throw new Error(`Operación 'rechazar' no permitida en estado ${this.nombre}`);
     }
@@ -16,7 +16,7 @@ export default class Estado {
         throw new Error(`Operación 'derivar' no permitida en estado ${this.nombre}`);
     }
 
-    // ✅ Métodos utilizados por transiciones
+    // Métodos utilizados para las transiciones
     puedeIniciar(evento) {
         return false;
     }

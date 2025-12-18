@@ -6,7 +6,7 @@ export default class PendienteDeRevision extends Estado {
         super("Pendiente de Revisión");
     }
 
-    // ✅ Transición automática después de 10 minutos
+    // Transición automática después de 10 minutos
     pasarASinRevision() {
         return new EventoSinRevision();
     }

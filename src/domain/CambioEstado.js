@@ -1,5 +1,3 @@
-import Estado from "./estados/Estado.js";
-
 export default class CambioEstado {
     constructor(cambioDB) {
         this.id = cambioDB.id || null;

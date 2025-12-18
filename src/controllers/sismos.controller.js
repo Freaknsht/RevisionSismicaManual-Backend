@@ -1,6 +1,6 @@
 import { 
     getSismos, 
-    getSismosPendientes,  // ✅ IMPORTAR
+    getSismosPendientes,
     iniciarRevisionSismo, 
     confirmarSismo, 
     rechazarSismo, 
@@ -19,7 +19,7 @@ export const obtenerSismos = async (req, res) => {
 
 export async function obtenerSismosPendientes(req, res) {
   try {
-    const sismos = await getSismosPendientes();  // ✅ AHORA ESTÁ IMPORTADO
+    const sismos = await getSismosPendientes();  // importa los Sismos
     res.json(sismos);
   } catch (error) {
     res.status(500).json({ error: error.message });

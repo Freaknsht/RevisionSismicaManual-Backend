@@ -15,7 +15,7 @@ export default class AutoDetectado extends Estado {
         evento.setEstado(this);
     }
 
-    // ✅ Transición automática después de 5 minutos
+    // Hace la transición automática después de 5 minutos
     pasarAPendiente() {
         return new PendienteDeRevision();
     }
