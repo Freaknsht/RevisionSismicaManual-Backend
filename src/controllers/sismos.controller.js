@@ -1,4 +1,11 @@
-import { getSismos, iniciarRevisionSismo, confirmarSismo, rechazarSismo, derivarSismo } from "../services/sismos.service.js";
+import { 
+    getSismos, 
+    getSismosPendientes,  // ✅ IMPORTAR
+    iniciarRevisionSismo, 
+    confirmarSismo, 
+    rechazarSismo, 
+    derivarSismo 
+} from "../services/sismos.service.js";
 
 export const obtenerSismos = async (req, res) => {
   try {
@@ -12,7 +19,7 @@ export const obtenerSismos = async (req, res) => {
 
 export async function obtenerSismosPendientes(req, res) {
   try {
-    const sismos = await getSismosPendientes();
+    const sismos = await getSismosPendientes();  // ✅ AHORA ESTÁ IMPORTADO
     res.json(sismos);
   } catch (error) {
     res.status(500).json({ error: error.message });
@@ -28,6 +35,7 @@ export async function iniciarRevision(req, res) {
     res.status(400).json({ error: error.message });
   }
 }
+
 export const confirmar = async (req, res) => {
   try {
     const result = await confirmarSismo(req.params.id);

@@ -1,44 +1,56 @@
 import Estado from "./Estado.js";
-import CambioEstado from "../CambioEstado.js";
+import Rechazado from "./Rechazado.js";
+import Confirmado from "./Confirmado.js";
+import DerivadoSuperior from "./DerivadoSuperior.js";
 
-//Estado bloqueado en Revision
 export default class BloqueadoEnRevision extends Estado {
+    
+    constructor() {
+        super("Bloqueado en Revisión");
+    }
 
-    rechazar(fechaHora, empleado, evento) {
-        this.cerrarCambioDeEstado(fechaHora, evento);
-        this.crearNuevoEstado("Rechazado", fechaHora, empleado, evento);
-        evento.cambios.push(new CambioEstado("Rechazado", fechaHora));
+    rechazar(fechaHora, empleado, evento, observacion) {
+        // ✅ Cerrar cambio actual
+        this.cerrarCambioDeEstado(evento, fechaHora);
+        
+        // ✅ Crear nuevo cambio de estado
+        evento.crearNuevoCambioEstado(new Rechazado(), fechaHora);
+        
+        // ✅ Actualizar estado del evento
+        evento.setEstado(new Rechazado());
     }
 
     confirmar(fechaHora, empleado, evento) {
-        this.cerrarCambioDeEstado( fechaHora, evento);
-        this.crearNuevoEstado("Confirmado", fechaHora, empleado, evento);
-        evento.cambios.push(new CambioEstado("Confirmado", fechaHora));
+        // ✅ Cerrar cambio actual
+        this.cerrarCambioDeEstado(evento, fechaHora);
+        
+        // ✅ Crear nuevo cambio de estado
+        evento.crearNuevoCambioEstado(new Confirmado(), fechaHora);
+        
+        // ✅ Actualizar estado del evento
+        evento.setEstado(new Confirmado());
     }
 
     derivar(fechaHora, empleado, evento) {
-        this.cerrarCambioDeEstado(fechaHora, evento);
-        this.crearNuevoEstado("Derivado a Superior", fechaHora, empleado, evento);
-        evento.cambios.push(new CambioEstado("Derivado a Superior", fechaHora));
+        // ✅ Cerrar cambio actual
+        this.cerrarCambioDeEstado(evento, fechaHora);
+        
+        // ✅ Crear nuevo cambio de estado
+        evento.crearNuevoCambioEstado(new DerivadoSuperior(), fechaHora);
+        
+        // ✅ Actualizar estado del evento
+        evento.setEstado(new DerivadoSuperior());
     }
 
-    cerrarCambioDeEstado(fechaHora, evento) {
-        const cambioActivo = evento.cambios.find(
-        c => c.fechaHoraFin === null
-        );
-
+    cerrarCambioDeEstado(evento, fechaHora) {
+        // ✅ CORREGIDO: usar cambiosDeEstado, no cambios
+        const cambioActivo = evento.cambiosDeEstado.find(c => !c.tieneFechaFin());
+        
         if (!cambioActivo) {
-        throw new Error("No hay cambio de estado activo");
+            throw new Error("No hay cambio de estado activo");
         }
 
-        cambioActivo.fechaHoraFin = fechaHora;
-    }
-
-    crearNuevoEstado(nombreEstado, fechaHora, empleado, evento) {
-        evento.nuevoEstado = nombreEstado;
-        evento.nuevoCambio = {
-        fechaHoraInicio: fechaHora,
-        empleadoId: empleado.id
-        };
+        // ✅ Usar método cerrar() de CambioEstado
+        cambioActivo.cerrar(fechaHora);
     }
 }

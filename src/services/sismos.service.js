@@ -1,7 +1,8 @@
 import prisma from "../prisma/client.js";
 import EventoSismico from "../domain/EventoSismico.js";
 import BloqueadoEnRevision from "../domain/estados/BloqueadoEnRevision.js";
-import { crearEstado } from "../domain/estados/EstadoFactory.js";
+import AutoDetectado from "../domain/estados/AutoDetectado.js";
+import Autoconfirmado from "../domain/estados/Autoconfirmado.js";
 
 //Obtiene los sismos
 export const getSismos = async () => {
@@ -12,6 +13,47 @@ export const getSismos = async () => {
     }
   });
 };
+
+// Crear evento sísmico
+export async function crearEventoSismico(datos) {
+  const evento = new EventoSismico(datos);
+
+  // ✅ CORREGIDO: Lógica de magnitud invertida
+  let estadoInicial;
+  if (evento.magnitud >= 4.0) {
+    // Magnitud alta = Autoconfirmado
+    estadoInicial = new Autoconfirmado();
+  } else {
+    // Magnitud baja = AutoDetectado
+    estadoInicial = new AutoDetectado();
+  }
+
+  // ✅ CORREGIDO: Mapeo correcto de propiedades
+  const eventoDB = await prisma.eventoSismico.create({
+    data: {
+      magnitud: evento.magnitud,
+      ubicacion: evento.ubicacion,
+      coordenadas: evento.coordenadas,
+      profundidad: evento.profundidad,
+      fechaHora: evento.fechaHora,
+      region: evento.region,
+      observaciones: evento.observaciones,
+      revisadoPor: evento.revisadoPor,
+      estado: {
+        connect: { nombre: estadoInicial.nombre }
+      }
+    },
+    include: { estado: true }
+  });
+
+  estadoInicial.iniciar(eventoDB, new Date());
+
+  if (estadoInicial.nombre === "Autodetectado") {
+    iniciarTemporizadores(eventoDB.id);
+  }
+
+  return eventoDB;
+}
 
 //Obtener los sismos Pendiente
 export async function getSismosPendientes() {
@@ -26,6 +68,7 @@ export async function getSismosPendientes() {
     },
     include: {
       estado: true,
+      cambios: true
     },
   });
 }
@@ -75,8 +118,8 @@ export async function iniciarRevisionSismo(eventoId) {
 
 //Busca el Ambito del evento sismico
 function esAmbitoEventoSismico(evento) {
-  // Ejemplo: solo eventos autodetectados
-  return evento.estado.nombre === "Autodetectado";
+  // ✅ CORREGIDO: Puede estar en Autodetectado O Pendiente de Revisión
+  return evento.estado.nombre === "Autodetectado" || evento.estado.nombre === "Pendiente de Revisión";
 }
 
 //Confirma el sismo
@@ -100,7 +143,7 @@ async function ejecutarCambioEstado(eventoId, accion) {
     where: { id: Number(eventoId) },
     include: {
       estado: true,
-      cambios: true,
+      cambiosDeEstado: true,  // ✅ CORREGIDO: cargar cambios completos
     },
   });
 
@@ -108,20 +151,32 @@ async function ejecutarCambioEstado(eventoId, accion) {
   if (eventoDB.estado.nombre !== "Bloqueado en Revisión")
     throw new Error("El evento no está en Bloqueado en Revisión");
 
-  const evento = new EventoSismico(eventoDB);
-  const estado = new BloqueadoEnRevision("Bloqueado en Revisión");
+  // ✅ CORREGIDO: pasar cambiosDeEstado al constructor
+  const evento = new EventoSismico({
+    ...eventoDB,
+    cambiosDeEstado: eventoDB.cambiosDeEstado  // ✅ Asegurar que se mapee correctamente
+  });
+  
+  const estado = new BloqueadoEnRevision();  // ✅ Usar constructor
 
+  // ✅ Ejecutar acción en el estado
   estado[accion](new Date(), null, evento);
 
   const nuevoEstado = await prisma.estado.findFirst({
     where: { nombre: evento.nuevoEstado },
   });
 
+  if (!nuevoEstado) {
+    throw new Error(`Estado '${evento.nuevoEstado}' no existe`);
+  }
+
+  // ✅ Actualizar estado en BD
   await prisma.eventoSismico.update({
     where: { id: evento.id },
     data: { estadoId: nuevoEstado.id },
   });
 
+  // ✅ Crear nuevo registro de cambio de estado
   await prisma.cambioEstado.create({
     data: {
       eventoId: evento.id,
@@ -130,5 +185,54 @@ async function ejecutarCambioEstado(eventoId, accion) {
     },
   });
 
-  return { mensaje: `Evento ${accion} correctamente` };
+  return { mensaje: `Evento ${accion}do correctamente` };
+}
+
+//Inicia el contador para los estados
+function iniciarTemporizadores(eventoId) {
+  // 5 minutos → Pendiente de Revisión
+  setTimeout(() => {
+    cambiarEstadoSiSigue(
+      eventoId,
+      "Autodetectado",
+      "Pendiente de Revisión"
+    );
+  }, 5 * 60 * 1000);
+
+  // 10 minutos → Evento sin Revisión
+  setTimeout(() => {
+    cambiarEstadoSiSigue(
+      eventoId,
+      "Pendiente de Revisión",
+      "Evento sin Revision"
+    );
+  }, 10 * 60 * 1000);
+}
+
+async function cambiarEstadoSiSigue(eventoId, estadoActual, estadoNuevo) {
+  const evento = await prisma.eventoSismico.findUnique({
+    where: { id: eventoId },
+    include: { estado: true }
+  });
+
+  if (!evento || evento.estado.nombre !== estadoActual) return;
+
+  const nuevoEstado = await prisma.estado.findFirst({
+    where: { nombre: estadoNuevo }
+  });
+
+  if (!nuevoEstado) return;
+
+  await prisma.eventoSismico.update({
+    where: { id: eventoId },
+    data: { estadoId: nuevoEstado.id }
+  });
+
+  await prisma.cambioEstado.create({
+    data: {
+      eventoId,
+      estadoId: nuevoEstado.id,
+      fechaHoraInicio: new Date()
+    }
+  });
 }

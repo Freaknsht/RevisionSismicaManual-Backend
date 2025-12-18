@@ -1,4 +1,6 @@
 import CambioEstado from "./CambioEstado.js";
+import AutoDetectado from "./estados/AutoDetectado.js";
+import Autoconfirmado from "./estados/Autoconfirmado.js";
 
 export default class EventoSismico {
     constructor(eventoDB) {
@@ -6,19 +8,48 @@ export default class EventoSismico {
 
         // Datos del sismo
         this.magnitud = eventoDB.magnitud;
-        this.ubicacion = eventoDB.location;
-        this.coordenadas = eventoDB.coordinates;
-        this.profundidad = eventoDB.depth;
-        this.fechaHora = new Date(eventoDB.timestamp);
+        this.ubicacion = eventoDB.ubicacion;
+        this.coordenadas = eventoDB.coordenadas;
+        this.profundidad = eventoDB.profundidad;
+        this.fechaHora = new Date(eventoDB.fechaHora);
         this.region = eventoDB.region;
-        this.observaciones = eventoDB.notes || null;
-        this.revisadoPor = eventoDB.reviewedBy || null;
+        this.observaciones = eventoDB.observaciones || null;
+        this.revisadoPor = eventoDB.revisadoPor || null;
 
         // Estado actual (instancia de Estado)
         this.estado = eventoDB.estado;
 
-        // Historial de cambios
-        this.cambiosDeEstado = eventoDB.cambios || [];
+        // ✅ CORREGIDO: Mapear correctamente cambios de la BD
+        this.cambiosDeEstado = (eventoDB.cambiosDeEstado || eventoDB.cambios || []).map(
+            c => new CambioEstado(c)
+        );
+        
+        // Nuevo estado después de transición (usado en ejecutarCambioEstado)
+        this.nuevoEstado = null;
+    }
+
+    // ✅ REMOVIDO: crearEventoSismico (lo hace el service)
+    // ✅ REMOVIDO: determinarEstadoInicial (lo hace el service)
+
+    actualizarEstadoPorTiempo(fechaActual) {
+        if (this.estado.nombre === "Autodetectado") {
+            if (this.minutosDesdeUltimoCambio(fechaActual) >= 5) {
+                this.estado = this.estado.pasarAPendiente();
+            }
+        }
+
+        if (this.estado.nombre === "Pendiente de Revisión") {
+            if (this.minutosDesdeUltimoCambio(fechaActual) >= 5) {
+                this.estado = this.estado.pasarASinRevision();
+            }
+        }
+    }
+
+    minutosDesdeUltimoCambio(fechaActual) {
+        if (this.cambiosDeEstado.length === 0) return 0;
+        const ultimoCambio = this.cambiosDeEstado[this.cambiosDeEstado.length - 1];
+        const diferencia = fechaActual - ultimoCambio.fechaHoraInicio;
+        return Math.floor(diferencia / (1000 * 60));
     }
 
     // =========================
@@ -27,26 +58,26 @@ export default class EventoSismico {
 
     confirmar(fechaHoraActual, empleadoLogueado) {
         this.estado.confirmar(
-        fechaHoraActual,
-        empleadoLogueado,
-        this
+            fechaHoraActual,
+            empleadoLogueado,
+            this
         );
     }
 
     rechazar(fechaHoraActual, empleadoLogueado, observacion) {
         this.estado.rechazar(
-        fechaHoraActual,
-        empleadoLogueado,
-        this,
-        observacion
+            fechaHoraActual,
+            empleadoLogueado,
+            this,
+            observacion
         );
     }
 
     derivar(fechaHoraActual, empleadoLogueado) {
         this.estado.derivar(
-        fechaHoraActual,
-        empleadoLogueado,
-        this
+            fechaHoraActual,
+            empleadoLogueado,
+            this
         );
     }
 
@@ -56,21 +87,13 @@ export default class EventoSismico {
 
     setEstado(nuevoEstado) {
         this.estado = nuevoEstado;
-    }
-
-    cerrarCambioEstadoActivo(fechaHoraActual) {
-        const cambioActivo = this.cambiosDeEstado.find(
-        c => !c.fechaHoraFin
-        );
-        if (cambioActivo) {
-        cambioActivo.setFechaFin(fechaHoraActual);
-        }
+        this.nuevoEstado = nuevoEstado.nombre;
     }
 
     crearNuevoCambioEstado(estadoNuevo, fechaHoraActual) {
         const cambio = new CambioEstado({
-        estado: estadoNuevo,
-        fechaHoraInicio: fechaHoraActual
+            estado: estadoNuevo.nombre,
+            fechaHoraInicio: fechaHoraActual
         });
         this.cambiosDeEstado.push(cambio);
     }

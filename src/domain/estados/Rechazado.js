@@ -1,2 +1,7 @@
 import Estado from "./Estado.js";
-export default class Rechazado extends Estado {}
+
+export default class Rechazado extends Estado {
+    constructor() {
+        super("Rechazado");
+    }
+}

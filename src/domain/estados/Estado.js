@@ -3,27 +3,33 @@ export default class Estado {
         this.nombre = nombre;
     }
 
-    cerrarCambioDeEstado(evento, fechaHora) {
-        const cambioAbierto = evento.cambios.find(c => !c.fechaHoraFin);
-        if (cambioAbierto) {
-        cambioAbierto.fechaHoraFin = fechaHora;
-        }
+    // ✅ Métodos abstractos (implementados por subclases)
+    rechazar(fechaHora, empleado, evento, observacion) {
+        throw new Error(`Operación 'rechazar' no permitida en estado ${this.nombre}`);
     }
 
-    crearNuevoEstado(evento, nombreNuevoEstado) {
-        evento.nuevoEstado = nombreNuevoEstado;
+    confirmar(fechaHora, empleado, evento) {
+        throw new Error(`Operación 'confirmar' no permitida en estado ${this.nombre}`);
     }
 
-    // Métodos “abstractos” (conceptuales)
-    rechazar() {
-        throw new Error("Operación no permitida en este estado");
+    derivar(fechaHora, empleado, evento) {
+        throw new Error(`Operación 'derivar' no permitida en estado ${this.nombre}`);
     }
 
-    confirmar() {
-        throw new Error("Operación no permitida en este estado");
+    // ✅ Métodos utilizados por transiciones
+    puedeIniciar(evento) {
+        return false;
     }
 
-    derivar() {
-        throw new Error("Operación no permitida en este estado");
+    iniciar(evento, fechaHora) {
+        // Implementado por subclases
+    }
+
+    pasarAPendiente() {
+        throw new Error("Esta transición no existe en este estado");
+    }
+
+    pasarASinRevision() {
+        throw new Error("Esta transición no existe en este estado");
     }
 }
