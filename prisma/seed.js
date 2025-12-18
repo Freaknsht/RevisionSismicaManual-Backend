@@ -16,13 +16,13 @@ async function main() {
       'Evento sin Revision'
     ];
 
-    for (const nombre of estados) {
-      await prisma.estado.upsert({
-        where: { nombre },
-        update: {},
-        create: { nombre }
-      });
-    }
+      for (const nombre of estados) {
+       const existe = await prisma.estado.findFirst({ where: { nombre } });
+        if (!existe) {
+         await prisma.estado.create({ data: { nombre } });
+        }
+      }
+
 
     console.log('✅ Estados creados');
 
